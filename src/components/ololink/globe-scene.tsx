@@ -303,7 +303,7 @@ function Earth() {
   return (
     <group>
       {/* sun — drives the day/night terminator across the globe */}
-      <directionalLight position={SUN_DIR.clone().multiplyScalar(12)} intensity={3.1} />
+      <directionalLight position={SUN_DIR.clone().multiplyScalar(12)} intensity={2.6} />
       {/* surface: NASA Blue Marble albedo + city lights on the night side.
           Ocean is metallic (specular mask) so it reads wet against the land. */}
       <mesh>
@@ -311,8 +311,8 @@ function Earth() {
         <meshStandardMaterial
           map={day}
           metalnessMap={specular}
-          metalness={0.85}
-          roughness={0.62}
+          metalness={0.28}
+          roughness={0.82}
           emissiveMap={lights}
           emissive="#ffd9a0"
           emissiveIntensity={1.15}
