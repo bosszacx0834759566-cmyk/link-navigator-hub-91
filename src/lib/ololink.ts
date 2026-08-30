@@ -165,76 +165,62 @@ function generateFleet(spec: FleetSpec): Asset[] {
 const KM_PER_DEG = 111;
 
 /**
- * Curated land anchors for gateway sites — verified continental/coastal-city
- * coordinates so ground stations never land in the ocean. Sites jitter a few
- * km around these anchors; drones/HAPS then cluster around the ground station.
+ * Operational regions. Each region hosts exactly one co-located site:
+ * HAPS-N (18–20 km) paired with Drone-N (2–5 km) and GS-N on the surface.
+ * Anchors are verified continental/coastal-city coordinates so ground
+ * stations never land in the ocean.
  */
-const LAND_ANCHORS: ReadonlyArray<readonly [lat: number, lon: number]> = [
-  [39.74, -104.99],   // Denver, USA
-  [34.05, -118.24],   // Los Angeles, USA
-  [41.88, -87.63],    // Chicago, USA
-  [29.76, -95.37],    // Houston, USA
-  [47.61, -122.33],   // Seattle, USA
-  [19.43, -99.13],    // Mexico City, Mexico
-  [-23.55, -46.63],   // São Paulo, Brazil
-  [-33.45, -70.67],   // Santiago, Chile
-  [4.71, -74.07],     // Bogotá, Colombia
-  [51.51, -0.13],     // London, UK
-  [48.86, 2.35],      // Paris, France
-  [52.52, 13.4],      // Berlin, Germany
-  [41.9, 12.5],       // Rome, Italy
-  [40.42, -3.7],      // Madrid, Spain
-  [30.04, 31.24],     // Cairo, Egypt
-  [6.52, 3.38],       // Lagos, Nigeria
-  [-26.2, 28.05],     // Johannesburg, South Africa
-  [-1.29, 36.82],     // Nairobi, Kenya
-  [55.76, 37.62],     // Moscow, Russia
-  [25.2, 55.27],      // Dubai, UAE
-  [28.61, 77.21],     // New Delhi, India
-  [19.08, 72.88],     // Mumbai, India
-  [13.75, 100.52],    // Bangkok, Thailand
-  [1.35, 103.82],     // Singapore
-  [3.14, 101.69],     // Kuala Lumpur, Malaysia
-  [-6.21, 106.85],    // Jakarta, Indonesia
-  [31.23, 121.47],    // Shanghai, China
-  [39.9, 116.4],      // Beijing, China
-  [35.68, 139.69],    // Tokyo, Japan
-  [37.57, 126.98],    // Seoul, South Korea
-  [-33.87, 151.21],   // Sydney, Australia
-  [-37.81, 144.96],   // Melbourne, Australia
-  [45.42, -75.7],     // Ottawa, Canada
-  [55.68, 12.57],     // Copenhagen, Denmark
-  [59.91, 10.75],     // Oslo, Norway
-  [-34.6, -58.38],    // Buenos Aires, Argentina
+export interface RegionAnchor {
+  id: string;
+  name: string;
+  short: string;
+  lat: number;
+  lon: number;
+}
+
+export const REGION_ANCHORS: RegionAnchor[] = [
+  { id: 'thailand', name: 'Thailand', short: 'TH', lat: 13.75, lon: 100.52 },
+  { id: 'united-states', name: 'United States', short: 'US', lat: 39.74, lon: -104.99 },
+  { id: 'japan', name: 'Japan', short: 'JP', lat: 35.68, lon: 139.69 },
+  { id: 'india', name: 'India', short: 'IN', lat: 28.61, lon: 77.21 },
+  { id: 'singapore', name: 'Singapore', short: 'SG', lat: 1.35, lon: 103.82 },
+  { id: 'indonesia', name: 'Indonesia', short: 'ID', lat: -6.21, lon: 106.85 },
+  { id: 'china', name: 'China', short: 'CN', lat: 31.23, lon: 121.47 },
+  { id: 'australia', name: 'Australia', short: 'AU', lat: -33.87, lon: 151.21 },
+  { id: 'united-kingdom', name: 'United Kingdom', short: 'UK', lat: 51.51, lon: -0.13 },
+  { id: 'germany', name: 'Germany', short: 'DE', lat: 52.52, lon: 13.4 },
+  { id: 'uae', name: 'United Arab Emirates', short: 'AE', lat: 25.2, lon: 55.27 },
+  { id: 'kenya', name: 'Kenya', short: 'KE', lat: -1.29, lon: 36.82 },
+  { id: 'south-africa', name: 'South Africa', short: 'ZA', lat: -26.2, lon: 28.05 },
+  { id: 'brazil', name: 'Brazil', short: 'BR', lat: -23.55, lon: -46.63 },
+  { id: 'canada', name: 'Canada', short: 'CA', lat: 45.42, lon: -75.7 },
 ];
 
 /**
  * Generate co-located operation sites: each site N is a cluster of
- * HAPS-N (18–20 km, above the cloud deck), Drone-N (below the clouds,
- * 2–5 km horizontally from its HAPS) and GS-N (10–15 km from the drone).
- * Sites anchor to curated land coordinates so ground stations stay on land.
+ * HAPS-N (18–20 km, above the cloud deck), Drone-N (2–5 km altitude,
+ * paired with its HAPS) and GS-N on the surface 10–15 km away.
  */
-function generateSites(count: number, startIndex: number, seed: number): Asset[] {
+function generateSites(anchors: RegionAnchor[], startIndex: number, seed: number): Asset[] {
   const rand = mulberry32(seed);
   const out: Asset[] = [];
-  for (let i = 0; i < count; i++) {
+  anchors.forEach((anchor, i) => {
     const n = startIndex + i;
-    const region = FLEET_REGIONS[i % FLEET_REGIONS.length]!;
+    const region = anchor.name;
     const healthOf = (): Health => (rand() < 0.88 ? 'NOMINAL' : rand() < 0.75 ? 'DEGRADED' : 'OFFLINE');
 
-    // Ground station anchor — curated land coordinate + small local jitter (≤ ~35 km).
-    const [aLat, aLon] = LAND_ANCHORS[i % LAND_ANCHORS.length]!;
-    const gsLat = aLat + (rand() - 0.5) * 0.6;
-    const gsLon = aLon + (rand() - 0.5) * 0.6;
+    // Ground station — anchored on land with a small local jitter (≤ ~35 km).
+    const gsLat = anchor.lat + (rand() - 0.5) * 0.6;
+    const gsLon = anchor.lon + (rand() - 0.5) * 0.6;
 
-    // Drone: 10–15 km from the ground station, below the cloud deck (3–6 km alt).
+    // Drone: 10–15 km from the ground station, 2–5 km altitude.
     const dBearing = rand() * Math.PI * 2;
     const dDistKm = 10.5 + rand() * 4;
     const drnLat = gsLat + (Math.cos(dBearing) * dDistKm) / KM_PER_DEG;
     const drnLon = gsLon + (Math.sin(dBearing) * dDistKm) / (KM_PER_DEG * Math.cos((gsLat * Math.PI) / 180));
-    const drnAlt = +(3 + rand() * 3).toFixed(1);
+    const drnAlt = +(2 + rand() * 3).toFixed(1);
 
-    // HAPS: 2–5 km horizontally from its drone, in the stratosphere above clouds.
+    // HAPS: paired with the drone, 2–5 km horizontally, stratospheric.
     const hBearing = rand() * Math.PI * 2;
     const hDistKm = 2.5 + rand() * 2;
     const hapsLat = drnLat + (Math.cos(hBearing) * hDistKm) / KM_PER_DEG;
@@ -247,16 +233,16 @@ function generateSites(count: number, startIndex: number, seed: number): Asset[]
       { id: `drone-gen-${n}`, name: `Drone-${n}`, kind: 'drone', lat: +drnLat.toFixed(2), lon: norm(drnLon), altKm: drnAlt, role: `Low-altitude relay (${region})`, region, health: healthOf() },
       { id: `ground-gen-${n}`, name: `GS-${n}`, kind: 'ground', lat: +gsLat.toFixed(2), lon: norm(gsLon), altKm: 0, role: `Gateway station (${region})`, region, health: healthOf() },
     );
-  }
+  });
   return out;
 }
 
 const GENERATED_ASSETS: Asset[] = [
-  // LEO constellation — 3 generated + 7 curated = 10 (focused coverage)
+  // LEO constellation — 23 generated + 7 curated = 30 satellites in motion
   ...generateFleet({
     kind: 'satellite',
     prefix: 'LEO',
-    count: 3,
+    count: 23,
     startIndex: 8,
     altMin: 500,
     altMax: 720,
@@ -265,11 +251,11 @@ const GENERATED_ASSETS: Asset[] = [
     role: 'Constellation capacity relay',
     seed: 1337,
   }),
-  // HAPS / Drone / GS operate as co-located clusters (site N = HAPS-N + Drone-N + GS-N):
-  // HAPS flies 2–5 km above its drone (above the cloud deck), the drone stays
-  // below the clouds, and the ground station sits 10–15 km away from the drone.
-  ...generateSites(3, 3, 4242),
+  // Regions 3..15 — HAPS-N / Drone-N / GS-N clusters (regions 1 and 2 are the
+  // curated Thailand and United States sites declared in ASSETS below).
+  ...generateSites(REGION_ANCHORS.slice(2), 3, 4242),
 ];
+
 
 export const ASSETS: Asset[] = [
   // LEO constellation (orchestrated, not owned) — spread across realistic orbits
