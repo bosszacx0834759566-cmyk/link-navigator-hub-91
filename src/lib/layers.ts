@@ -9,7 +9,7 @@
  *   LEO satellite  →  HAPS  →  relay drone  →  ground station
  */
 
-import type { Asset, AssetKind } from '@/lib/ololink';
+import { REGION_ANCHORS, type Asset, type AssetKind } from '@/lib/ololink';
 
 export interface LayerDef {
   /** scene radius of the shell (Earth surface = 1) */
