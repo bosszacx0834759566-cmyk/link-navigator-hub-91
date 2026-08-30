@@ -16,6 +16,9 @@ import * as THREE from 'three';
 
 import { EARTH_8K_URL, EARTH_TILE_BY_REGION, type EarthTile } from '@/lib/earth-textures';
 import earthClouds from '@/assets/earth_clouds_1024.png';
+import earthLights from '@/assets/earth_lights_2048.png';
+import earthSpecular from '@/assets/earth_specular_2048.jpg';
+
 
 import {
   ASSET_BY_ID,
@@ -269,15 +272,25 @@ function RegionTile({ tile }: { tile: EarthTile }) {
 function Earth() {
   const gl = useThree((s) => s.gl);
   const { level, region } = useLod();
-  const maps = useLoader(THREE.TextureLoader, [EARTH_8K_URL, earthClouds]);
+  const maps = useLoader(THREE.TextureLoader, [
+    EARTH_8K_URL,
+    earthClouds,
+    earthLights,
+    earthSpecular,
+  ]);
   const day = maps[0]!;
   const clouds = maps[1]!;
+  const lights = maps[2]!;
+  const specular = maps[3]!;
 
   useMemo(() => {
     const maxAniso = gl.capabilities.getMaxAnisotropy();
     tuneEarthTexture(day, maxAniso);
     tuneEarthTexture(clouds, maxAniso, false);
-  }, [day, clouds, gl]);
+    tuneEarthTexture(lights, maxAniso, false);
+    tuneEarthTexture(specular, maxAniso, false);
+  }, [day, clouds, lights, specular, gl]);
+
 
   /** regional + local views get the native-resolution imagery tile */
   const tile = level !== 'global' && region ? EARTH_TILE_BY_REGION[region] : undefined;
@@ -289,11 +302,23 @@ function Earth() {
 
   return (
     <group>
-      {/* surface: NASA Blue Marble albedo, unlit so the whole globe is evenly visible */}
+      {/* sun — drives the day/night terminator across the globe */}
+      <directionalLight position={SUN_DIR.clone().multiplyScalar(12)} intensity={2.6} />
+      {/* surface: NASA Blue Marble albedo + city lights on the night side.
+          Ocean is metallic (specular mask) so it reads wet against the land. */}
       <mesh>
         <sphereGeometry args={[1, 128, 128]} />
-        <meshBasicMaterial map={day} toneMapped={false} color="#ffffff" />
+        <meshStandardMaterial
+          map={day}
+          metalnessMap={specular}
+          metalness={0.28}
+          roughness={0.82}
+          emissiveMap={lights}
+          emissive="#ffd9a0"
+          emissiveIntensity={1.15}
+        />
       </mesh>
+
 
       {/* high-resolution regional imagery */}
       {tile ? (
@@ -306,15 +331,17 @@ function Earth() {
       {/* cloud layer */}
       <mesh ref={cloudRef} scale={1.006}>
         <sphereGeometry args={[1, 96, 96]} />
-        <meshBasicMaterial
+        <meshStandardMaterial
           map={clouds}
           alphaMap={clouds}
           transparent
-          opacity={0.42}
+          opacity={0.5}
           depthWrite={false}
-          toneMapped={false}
+          roughness={1}
+          metalness={0}
           color="#ffffff"
         />
+
       </mesh>
       {/* inner atmosphere */}
       <mesh>
@@ -2014,22 +2041,20 @@ function SceneContent({
     [activeRegion]
   );
 
-  /** ground stations, HAPS, drones and LEO satellites are hidden */
+  /** Phase 1 core simulation: the full fleet is rendered.
+   *  LEO satellites are always visible (they orbit continuously); the
+   *  HAPS / drone / ground layers scope to the region in focus once the
+   *  camera drops out of global view. */
   const visibleAssets = useMemo(
     () =>
       ASSETS.filter((a) => {
-        if (
-          a.kind === 'satellite' ||
-          a.kind === 'ground' ||
-          a.kind === 'haps' ||
-          a.kind === 'drone'
-        )
-          return false;
-        if (!detailed) return false;
+        if (a.kind === 'satellite') return true;
+        if (a.kind === 'customer') return detailed && inScope(regionIdOf(a));
         return inScope(regionIdOf(a));
       }),
     [detailed, inScope]
   );
+
   const visibleIds = useMemo(() => new Set(visibleAssets.map((a) => a.id)), [visibleAssets]);
 
   const visibleLinks = useMemo(
@@ -2078,16 +2103,33 @@ function SceneContent({
 
   return (
     <>
-      {/* uniform ambient lighting only — no day/night terminator, no shadows */}
-      <ambientLight intensity={3.2} />
-
-      
+      {/* soft fill — the sun light lives on the Earth group and makes the terminator */}
+      <ambientLight intensity={0.32} />
 
       <LodDriver onChange={setLod} />
 
       <Suspense fallback={null}>
         <Earth />
       </Suspense>
+
+      {/* continuous LEO propagation — updates the live position map each frame */}
+      <OrbitDriver state={state} live={live} />
+
+      {/* the fleet: 30 LEO / 15 HAPS / 15 relay drones / 15 ground stations */}
+      {visibleAssets.map((a) => (
+        <AssetNode
+          key={a.id}
+          asset={a}
+          live={live}
+          selected={selection?.type === 'asset' && selection.id === a.id}
+          onRoute={routeAssets.has(a.id)}
+          onSelect={select}
+          showLabel={detailed}
+          tether={detailed && a.kind !== 'satellite'}
+          detail={localView}
+        />
+      ))}
+
 
       <OrbitControls
         ref={controls}
