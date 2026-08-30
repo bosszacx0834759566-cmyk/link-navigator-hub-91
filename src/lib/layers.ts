@@ -69,10 +69,15 @@ export interface RegionDef {
   spread: number;
 }
 
-export const REGIONS: RegionDef[] = [
-  { id: 'thailand', name: 'Thailand', short: 'TH', lat: 13.8, lon: 100.7, spread: 0.11 },
-  { id: 'united-states', name: 'United States', short: 'US', lat: 39.6, lon: -104.9, spread: 0.12 },
-];
+export const REGIONS: RegionDef[] = REGION_ANCHORS.map((a) => ({
+  id: a.id,
+  name: a.name,
+  short: a.short,
+  lat: a.lat,
+  lon: a.lon,
+  spread: 0.11,
+}));
+
 
 export const REGION_BY_ID: Record<string, RegionDef> = Object.fromEntries(
   REGIONS.map((r) => [r.id, r])
