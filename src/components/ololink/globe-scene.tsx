@@ -2103,16 +2103,33 @@ function SceneContent({
 
   return (
     <>
-      {/* uniform ambient lighting only — no day/night terminator, no shadows */}
-      <ambientLight intensity={3.2} />
-
-      
+      {/* soft fill — the sun light lives on the Earth group and makes the terminator */}
+      <ambientLight intensity={0.32} />
 
       <LodDriver onChange={setLod} />
 
       <Suspense fallback={null}>
         <Earth />
       </Suspense>
+
+      {/* continuous LEO propagation — updates the live position map each frame */}
+      <OrbitDriver state={state} live={live} />
+
+      {/* the fleet: 30 LEO / 15 HAPS / 15 relay drones / 15 ground stations */}
+      {visibleAssets.map((a) => (
+        <AssetNode
+          key={a.id}
+          asset={a}
+          live={live}
+          selected={selection?.type === 'asset' && selection.id === a.id}
+          onRoute={routeAssets.has(a.id)}
+          onSelect={select}
+          showLabel={detailed}
+          tether={detailed && a.kind !== 'satellite'}
+          detail={localView}
+        />
+      ))}
+
 
       <OrbitControls
         ref={controls}
