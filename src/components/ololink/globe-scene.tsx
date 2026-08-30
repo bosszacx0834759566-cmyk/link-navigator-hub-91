@@ -289,11 +289,23 @@ function Earth() {
 
   return (
     <group>
-      {/* surface: NASA Blue Marble albedo, unlit so the whole globe is evenly visible */}
+      {/* sun — drives the day/night terminator across the globe */}
+      <directionalLight position={SUN_DIR.clone().multiplyScalar(12)} intensity={3.1} />
+      {/* surface: NASA Blue Marble albedo + city lights on the night side.
+          Ocean is metallic (specular mask) so it reads wet against the land. */}
       <mesh>
         <sphereGeometry args={[1, 128, 128]} />
-        <meshBasicMaterial map={day} toneMapped={false} color="#ffffff" />
+        <meshStandardMaterial
+          map={day}
+          metalnessMap={specular}
+          metalness={0.85}
+          roughness={0.62}
+          emissiveMap={lights}
+          emissive="#ffd9a0"
+          emissiveIntensity={1.15}
+        />
       </mesh>
+
 
       {/* high-resolution regional imagery */}
       {tile ? (
