@@ -2041,22 +2041,20 @@ function SceneContent({
     [activeRegion]
   );
 
-  /** ground stations, HAPS, drones and LEO satellites are hidden */
+  /** Phase 1 core simulation: the full fleet is rendered.
+   *  LEO satellites are always visible (they orbit continuously); the
+   *  HAPS / drone / ground layers scope to the region in focus once the
+   *  camera drops out of global view. */
   const visibleAssets = useMemo(
     () =>
       ASSETS.filter((a) => {
-        if (
-          a.kind === 'satellite' ||
-          a.kind === 'ground' ||
-          a.kind === 'haps' ||
-          a.kind === 'drone'
-        )
-          return false;
-        if (!detailed) return false;
+        if (a.kind === 'satellite') return true;
+        if (a.kind === 'customer') return detailed && inScope(regionIdOf(a));
         return inScope(regionIdOf(a));
       }),
     [detailed, inScope]
   );
+
   const visibleIds = useMemo(() => new Set(visibleAssets.map((a) => a.id)), [visibleAssets]);
 
   const visibleLinks = useMemo(
