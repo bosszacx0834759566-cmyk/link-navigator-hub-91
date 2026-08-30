@@ -16,6 +16,9 @@ import * as THREE from 'three';
 
 import { EARTH_8K_URL, EARTH_TILE_BY_REGION, type EarthTile } from '@/lib/earth-textures';
 import earthClouds from '@/assets/earth_clouds_1024.png';
+import earthLights from '@/assets/earth_lights_2048.png';
+import earthSpecular from '@/assets/earth_specular_2048.jpg';
+
 
 import {
   ASSET_BY_ID,
